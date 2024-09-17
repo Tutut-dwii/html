@@ -1,0 +1,83 @@
+package main
+
+import (
+	"encoding/hex"
+	"fmt"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/tarm/serial"
+)
+
+func main() {
+	// Atur port serial
+	c := &serial.Config{
+		Name: "/dev/ttyUSB0",
+		Baud: 57600,
+		//ReadTimeout: time.Second * 5,
+	}
+
+	// Buka koneksi ke port
+	s, err := serial.OpenPort(c)
+	if err != nil {
+		log.Fatalf("Gagal membuka port serial: %v", err)
+	}
+	defer s.Close()
+
+	fmt.Println("Membaca data RFID dari Card Teck CT i809...")
+
+	buf := make([]byte, 18)
+
+	for {
+		n, err := s.Read(buf)
+		if err != nil {
+			log.Printf("Gagal membaca data: %v", err)
+			continue
+		}
+
+		if n > 0 {
+			// Konversi hasil baca ke string hex
+			tag := hex.EncodeToString(buf)
+
+			// Hapus 8 digit pertama dan 2 digit terakhir
+			if len(tag) >= 20 {
+				tagManipulasi := tag[8:32]
+				timestamp := time.Now().Format("2006-01-02 15:04:05")
+				fmt.Printf("Waktu: %s, RFID Tag : %s\n", timestamp, tagManipulasi)
+
+				// Kirim data ke server
+				sendDataToServer(tagManipulasi, timestamp)
+			} else {
+				fmt.Println("Coba Lagi")
+			}
+		}
+
+	}
+}
+
+func sendDataToServer(tag string, timestamp string) {
+	// URL server di sini
+	url := "http://192.168.1.169:3000/api/rfid_logs"
+
+	jsonStr := fmt.Sprintf(`{"tag": "%s", "timestamp": "%s"}`, tag, timestamp)
+	fmt.Printf("Mengirim data ke server: %s\n", jsonStr)
+	req, err := http.NewRequest("POST", url, strings.NewReader(jsonStr))
+	if err != nil {
+		log.Printf("Gagal membuat request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Gagal mengirim data ke server: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Data berhasil dikirim ke server: %s\n", resp.Status)
+}
