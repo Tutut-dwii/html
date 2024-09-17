@@ -1,0 +1,76 @@
+const express = require('express');
+const mysql = require('mysql2');
+const cors = require('cors');
+
+// Inisialisasi aplikasi Express
+const app = express();
+const port = 3000;
+
+// Middleware untuk parsing JSON
+app.use(express.json());
+app.use(cors());
+
+// Konfigurasi koneksi ke database MySQL
+const db = mysql.createConnection({
+  host: 'localhost', // Ganti dengan IP server jika tidak di localhost
+  user: 'root',
+  password: 'Coba.id123', // Ganti dengan password MySQL Anda
+  database: 'rfid_new'       // Nama database yang digunakan
+});
+
+// Hubungkan ke database
+db.connect((err) => {
+  if (err) {
+    console.error('Gagal menghubungkan ke database:', err);
+    process.exit(1);
+  }
+  console.log('Terhubung ke database MySQL.');
+});
+
+app.get('/', (req, res) => {
+  res.send('Server is running');
+});
+
+// Endpoint untuk menerima data RFID dari Raspberry Pi
+app.post('/api/rfid_logs', (req, res) => {
+  console.log('Data diterima dari Raspberry Pi:', req.body);
+ 
+  const { tag, timestamp } = req.body;
+
+  //console.log('Data diterima:', req.body); // Untuk debugging
+
+  // Validasi data yang diterima
+  if (!tag || !timestamp) {
+    return res.status(400).send('Tag dan timestamp diperlukan.');
+  }
+
+  // Query untuk menyimpan data ke database
+  const query = 'INSERT INTO rfid_logs (Tag, timestamp) VALUES (?, ?)';
+  db.query(query, [tag, timestamp], (err, results) => {
+    if (err) {
+      console.error('Gagal menyimpan data ke database:', err);
+      return res.status(500).send('Gagal menyimpan data.');
+    }
+
+    res.status(200).send('Data berhasil disimpan.');
+  });
+});
+
+// Endpoint untuk mengambil data RFID dari database
+app.get('/api/rfid_logs', (req, res) => {
+  const query = 'SELECT * FROM rfid_logs';
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching data:', err);
+      return res.status(500).json({ error: 'Failed to fetch data from database' });
+    }
+    res.json(results);
+    
+  });
+
+});
+
+// Jalankan server di port 3000
+app.listen(port, () => {
+  console.log(`Server berjalan di http://localhost:${port}`);
+});
