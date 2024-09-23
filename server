@@ -44,7 +44,7 @@ app.post('/api/rfid_logs', (req, res) => {
     return res.status(400).send('Tag dan timestamp diperlukan.');
   }
 
-  // Query untuk menyimpan data ke database
+  // Query untuk menyimpan data ke database.
   const query = 'INSERT INTO rfid_logs (Tag, timestamp) VALUES (?, ?)';
   db.query(query, [tag, timestamp], (err, results) => {
     if (err) {
